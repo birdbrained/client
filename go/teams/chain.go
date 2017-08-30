@@ -249,6 +249,18 @@ func (t TeamSigChainState) GetUsersWithRole(role keybase1.TeamRole) (res []keyba
 	return res, nil
 }
 
+func (t TeamSigChainState) GetUsersWithRoleOrAbove(role keybase1.TeamRole) (res []keybase1.UserVersion, err error) {
+	if role == keybase1.TeamRole_NONE {
+		return nil, errors.New("cannot get users with NONE role")
+	}
+	for uv := range t.inner.UserLog {
+		if t.getUserRole(uv).IsOrAbove(role) {
+			res = append(res, uv)
+		}
+	}
+	return res, nil
+}
+
 func (t TeamSigChainState) GetLatestPerTeamKey() (keybase1.PerTeamKey, error) {
 	res, ok := t.inner.PerTeamKeys[keybase1.PerTeamKeyGeneration(len(t.inner.PerTeamKeys))]
 	if !ok {

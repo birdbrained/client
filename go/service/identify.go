@@ -148,7 +148,71 @@ func (h *IdentifyHandler) resolveUserOrTeam(ctx context.Context, arg string) (u 
 }
 
 func (h *IdentifyHandler) ResolveIdentifyImplicitTeam(ctx context.Context, arg keybase1.ResolveIdentifyImplicitTeamArg) (res keybase1.ResolveIdentifyImplicitTeamRes, err error) {
-	return res, fmt.Errorf("TODO")
+	ctx = libkb.WithLogTag(ctx, "RII")
+	defer h.G().CTrace(ctx, "IdentifyHandler#ResolveIdentifyImplicitTeam", func() error { return err })()
+
+	h.G().Log.CDebugf(ctx, "ResolveIdentifyImplicitTeam assertions:'%v'", arg.Assertions)
+
+	return res, fmt.Errorf("TODO: implement ResolveIdentifyImplicitTeam")
+
+	var teamID keybase1.TeamID
+	var impName keybase1.ImplicitTeamDisplayName
+	if arg.Create {
+		teamID, impName, err = teams.LookupOrCreateImplicitTeam(ctx, h.G(), lookupName, arg.IsPublic)
+	} else {
+		teamID, impName, err = teams.LookupImplicitTeam(ctx, h.G(), lookupName, arg.IsPublic)
+	}
+	if err != nil {
+		return res, err
+	}
+
+	// can be nil
+	myUID := h.G().ActiveDevice.UID()
+
+	var displayNameKBFS string
+	if myUID.Exists() {
+		var name libkb.NormalizedUsername
+		name, err = h.G().GetUPAKLoader().LookupUsername(ctx, myUID)
+		if err != nil {
+			return res, err
+		}
+		// display name with the logged-in user first
+		displayNameKBFS, err = teams.FormatImplicitTeamDisplayNameWithUserFront(context.TODO(), h.G(), impName, name)
+	} else {
+		displayNameKBFS, err = teams.FormatImplicitTeamDisplayName(context.TODO(), h.G(), impName)
+	}
+	if err != nil {
+		return res, err
+	}
+
+	team, err := teams.Load(ctx, h.G(), keybase1.LoadTeamArg{
+		ID:          teamID,
+		ForceRepoll: true,
+	})
+	if err != nil {
+		return res, err
+	}
+
+	writers, err := team.UsersWithRoleOrAbove(keybase1.TeamRole_WRITER)
+	if err != nil {
+		return res, err
+	}
+
+	if true {
+		return res, fmt.Errorf("TODO: ResolveIdentifyImplicitTeam identify members")
+	}
+
+	var trackBreaks map[keybase1.UserVersion]keybase1.IdentifyTrackBreaks
+	if true {
+		return res, fmt.Errorf("TODO: ResolveIdentifyImplicitTeam TrackBreaks")
+	}
+
+	return keybase1.ResolveIdentifyImplicitTeamRes{
+		DisplayName: displayNameKBFS,
+		TeamID:      teamID,
+		Writers:     writers,
+		TrackBreaks: trackBreaks,
+	}, nil
 }
 
 func (u *RemoteIdentifyUI) newContext() (context.Context, func()) {
