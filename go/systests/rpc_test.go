@@ -49,6 +49,8 @@ func TestRPCs(t *testing.T) {
 	testIdentify2(t, tc2.G)
 	testMerkle(t, tc2.G)
 	testIdentifyLite(t)
+	testIdentifyLite(t)
+	testResolveIdentifyImplicitTeam(t)
 
 	if err := client.CtlServiceStop(tc2.G); err != nil {
 		t.Fatal(err)
@@ -341,4 +343,42 @@ func testIdentifyLite(t *testing.T) {
 			t.Fatalf("assertion %s, error: %s (%T), expected libkb.NotFoundError", assertion, err, err)
 		}
 	}
+}
+
+func testResolveIdentifyImplicitTeam(t *testing.T) {
+	tt := newTeamTester(t)
+	defer tt.cleanup()
+
+	tt.addUser("abc")
+	g := tt.users[0].tc.G
+
+	getTeamName := func(teamID keybase1.TeamID) keybase1.TeamName {
+		team, err := teams.Load(context.Background(), g, keybase1.LoadTeamArg{
+			ID: teamID,
+		})
+		require.NoError(t, err)
+		return team.Name()
+	}
+
+	t.Logf("make an implicit team")
+	iTeamCreateName := strings.Join([]string{tt.users[0].username, "bob@github"}, ",")
+	iTeamID, _, err := teams.LookupOrCreateImplicitTeam(context.TODO(), g, iTeamCreateName, false /*isPublic*/)
+	require.NoError(t, err)
+	iTeamImpName := getTeamName(iTeamID)
+	require.True(t, iTeamImpName.IsImplicit())
+	require.NoError(t, err)
+
+	cli, err := client.GetIdentifyClient(g)
+	require.NoError(t, err, "failed to get new identifyclient")
+
+	res, err := cli.ResolveIdentifyImplicitTeam(context.Background(), keybase1.ResolveIdentifyImplicitTeamArg{
+		Assertions:       iTeamCreateName,
+		Suffix:           "",
+		IsPublic:         false,
+		DoIdentifies:     false,
+		Create:           true,
+		IdentifyBehavior: keybase1.TLFIdentifyBehavior_DEFAULT_KBFS,
+	})
+	require.NoError(t, err)
+	_ = res
 }
